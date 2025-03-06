@@ -1,148 +1,222 @@
+pip install pandas openpyxl matplotlib seaborn
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from openpyxl import Workbook
-from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
+from openpyxl import Workbook, load_workbook
+from openpyxl.styles import PatternFill, Font, Alignment, Border, Side, Color
 from openpyxl.drawing.image import Image
-from openpyxl.chart import PieChart, Reference, BarChart
+from openpyxl.chart import PieChart, Reference, BarChart, LineChart
+from openpyxl.worksheet.dimensions import ColumnDimension
+from datetime import datetime
 
 class FinancialPlanner:
     def __init__(self):
         self.exchange_rate = 0.00025  # 1 COP = 0.00025 USD
         self.workbook = Workbook()
         self.setup_colors()
+        self.months = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 
+                      'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
         
     def setup_colors(self):
         self.colors = {
+            'header_blue': '4472C4',
+            'header_yellow': 'FFD700',
             'pastel_blue': 'B4D8E7',
             'pastel_yellow': 'FFF4BD',
             'pastel_green': 'C8E6C9',
             'pastel_pink': 'FFD1DC'
         }
 
-    def create_monthly_budget(self):
+    def create_annual_planner(self):
+        # Crear hoja de resumen anual
+        self.create_annual_summary()
+        
+        # Crear hojas mensuales
+        for month in self.months:
+            self.create_monthly_sheet(month)
+        
+        # Crear hojas adicionales
+        self.create_savings_tracker()
+        self.create_debt_control()
+        self.create_travel_planner()
+
+    def create_annual_summary(self):
         ws = self.workbook.active
-        ws.title = "Presupuesto Mensual"
+        ws.title = "Resumen Anual"
         
-        # Datos de ingresos
-        income_usd = {
-            'Jorge (USD)': 1506,
-            'Gabby (COP convertido a USD)': 2170000 * self.exchange_rate
-        }
+        # Diseño del encabezado
+        self.create_fancy_header(ws, "RESUMEN FINANCIERO ANUAL 2024", 1)
         
-        # Gastos Jorge (USD)
-        expenses_jorge = {
+        # Columnas para el resumen
+        headers = ['Mes', 'Ingresos Totales (USD)', 'Gastos Totales (USD)', 
+                  'Ahorros (USD)', '% Gastos', '% Ahorro']
+        
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=3, column=col, value=header)
+            self.style_header_cell(cell)
+            ws.column_dimensions[chr(64 + col)].width = 20
+
+    def create_monthly_sheet(self, month):
+        ws = self.workbook.create_sheet(month)
+        
+        # Configurar ancho de columnas
+        for col in ['A', 'B', 'C', 'D']:
+            ws.column_dimensions[col].width = 20
+
+        # Primera Quincena
+        self.create_section_header(ws, f"{month} - Primera Quincena", 1, self.colors['header_blue'])
+        
+        # Ingresos Primera Quincena
+        income_headers = ['Concepto', 'Monto', 'Moneda', 'USD Equivalente']
+        row = 3
+        for col, header in enumerate(income_headers, 1):
+            cell = ws.cell(row=row, column=col, value=header)
+            self.style_header_cell(cell)
+        
+        # Gastos Fijos Jorge
+        row = 6
+        self.create_section_header(ws, "Gastos Fijos Jorge (USD)", row, self.colors['pastel_yellow'])
+        fixed_expenses_jorge = {
             'SchoolFirst': 400,
-            'Cozy House': 800,  # 400 * 2 por ser quincenal
+            'Cozy House': 400,
             'Cooper': 730,
-            'Car Insurance': 140,
-            'Esposa': 100,
-            'Golf': 100,
-            'Salidas Amigos': 100
+            'Car Insurance': 140
         }
         
-        # Gastos Gabby (COP convertidos a USD)
-        expenses_gabby = {
-            'Casa': 400000 * self.exchange_rate,
-            'Arreglo Casa': 800000 * self.exchange_rate,
-            'Tarjeta Crédito': 500000 * self.exchange_rate,
-            'Esposo': 200000 * self.exchange_rate,
-            'Comida': 150000 * self.exchange_rate,
-            'Transporte': 150000 * self.exchange_rate,
-            'Cozy House': 400000 * self.exchange_rate
+        # Gastos Fijos Gabby
+        row = 12
+        self.create_section_header(ws, "Gastos Fijos Gabby", row, self.colors['pastel_pink'])
+        fixed_expenses_gabby = {
+            'Casa': 400000,
+            'Tarjeta Crédito': 500000,
+            'Cozy House': 400000
         }
 
-        # Crear secciones
-        self.create_section_header(ws, "INGRESOS MENSUALES", 1, self.colors['pastel_blue'])
-        row = 2
-        for source, amount in income_usd.items():
-            ws.cell(row=row, column=1, value=source)
-            ws.cell(row=row, column=2, value=amount)
-            row += 1
-
-        # Gastos Jorge
-        row += 2
-        self.create_section_header(ws, "GASTOS JORGE (USD)", row, self.colors['pastel_yellow'])
-        row += 1
-        for expense, amount in expenses_jorge.items():
-            ws.cell(row=row, column=1, value=expense)
-            ws.cell(row=row, column=2, value=amount)
-            row += 1
-
-        # Gastos Gabby
-        row += 2
-        self.create_section_header(ws, "GASTOS GABBY (USD)", row, self.colors['pastel_pink'])
-        row += 1
-        for expense, amount in expenses_gabby.items():
-            ws.cell(row=row, column=1, value=expense)
-            ws.cell(row=row, column=2, value=amount)
-            row += 1
-
-        # Crear gráficos
-        self.create_pie_chart(ws, "Distribución de Gastos", row + 2)
+        # Segunda Quincena
+        row = 18
+        self.create_section_header(ws, f"{month} - Segunda Quincena", row, self.colors['header_yellow'])
         
-    def create_debt_control(self):
-        ws = self.workbook.create_sheet("Control de Deudas")
-        # Implementar el control de deudas similar a la imagen
+        # Gastos Variables
+        row = 24
+        self.create_section_header(ws, "Gastos Variables", row, self.colors['pastel_green'])
+        variable_expenses = {
+            'Comida': '',
+            'Transporte': '',
+            'Entretenimiento': '',
+            'Otros': ''
+        }
         
+        # Resumen Mensual
+        row = 30
+        self.create_section_header(ws, "Resumen Mensual", row, self.colors['header_blue'])
+        
+        # Gráficos
+        self.create_monthly_charts(ws, row + 15)
+
     def create_savings_tracker(self):
-        ws = self.workbook.create_sheet("Tracking de Ahorro")
+        ws = self.workbook.create_sheet("Plan de Ahorro")
         
-        # Metas de ahorro
+        self.create_fancy_header(ws, "PLANIFICADOR DE AHORRO", 1)
+        
+        # Meta Cartagena
         savings_goals = {
-            'Viaje Cartagena': 1100,
             'Hotel All Inclusive': 650,
             'Vuelos': 200,
             'Transporte': 80,
-            'Cena Romántica': 100
+            'Cena Romántica': 100,
+            'Actividades': 70
         }
         
-        # Crear sección de metas
-        self.create_section_header(ws, "METAS DE AHORRO", 1, self.colors['pastel_green'])
-        row = 2
-        for goal, amount in savings_goals.items():
-            ws.cell(row=row, column=1, value=goal)
-            ws.cell(row=row, column=2, value=amount)
-            row += 1
-            
-        # Crear gráfico de progreso
-        self.create_progress_chart(ws, row + 2)
+        row = 3
+        self.create_section_header(ws, "META: VIAJE A CARTAGENA", row, self.colors['pastel_blue'])
+        total_goal = sum(savings_goals.values())
+        
+        # Tabla de metas
+        headers = ['Concepto', 'Monto (USD)', 'Progreso', 'Estado']
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row + 1, column=col, value=header)
+            self.style_header_cell(cell)
 
-    def create_section_header(self, ws, title, row, color):
-        cell = ws.cell(row=row, column=1, value=title)
-        cell.fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal="center")
-        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=2)
+    def create_debt_control(self):
+        ws = self.workbook.create_sheet("Control de Deudas")
+        
+        self.create_fancy_header(ws, "CONTROL DE DEUDAS", 1)
+        
+        headers = ['Deuda', 'Monto Original', 'Interés', 'Pago Mensual', 'Saldo', 'Fecha Último Pago']
+        row = 3
+        for col, header in enumerate(headers, 1):
+            cell = ws.cell(row=row, column=col, value=header)
+            self.style_header_cell(cell)
 
-    def create_pie_chart(self, ws, title, row):
+    def create_travel_planner(self):
+        ws = self.workbook.create_sheet("Viaje Cartagena")
+        
+        self.create_fancy_header(ws, "PLANIFICADOR VIAJE CARTAGENA", 1)
+        
+        # Detalles del viaje
+        trip_details = {
+            'Fechas': '25-28 de [Mes]',
+            'Hotel All Inclusive': 650,
+            'Vuelos': 200,
+            'Transporte Local': 80,
+            'Cena Romántica': 100,
+            'Actividades Planeadas': 'Atardecer, Playas, Tour Ciudad'
+        }
+        
+        row = 3
+        self.create_section_header(ws, "DETALLES DEL VIAJE", row, self.colors['pastel_blue'])
+
+    def create_monthly_charts(self, ws, row):
+        # Gráfico de Gastos
         pie = PieChart()
-        pie.title = title
-        # Configurar datos para el gráfico
-        data = Reference(ws, min_col=2, min_row=2, max_row=15)
-        labels = Reference(ws, min_col=1, min_row=2, max_row=15)
+        pie.title = "Distribución de Gastos"
+        data = Reference(ws, min_col=2, min_row=6, max_row=16)
+        labels = Reference(ws, min_col=1, min_row=6, max_row=16)
         pie.add_data(data)
         pie.set_categories(labels)
-        ws.add_chart(pie, f"D{row}")
+        ws.add_chart(pie, f"F{row}")
+        
+        # Gráfico de Progreso de Ahorro
+        line = LineChart()
+        line.title = "Progreso de Ahorro"
+        data = Reference(ws, min_col=2, min_row=30, max_row=35)
+        labels = Reference(ws, min_col=1, min_row=30, max_row=35)
+        line.add_data(data)
+        line.set_categories(labels)
+        ws.add_chart(line, f"F{row + 15}")
 
-    def create_progress_chart(self, ws, row):
-        chart = BarChart()
-        chart.title = "Progreso de Ahorro"
-        # Configurar datos para el gráfico
-        data = Reference(ws, min_col=2, min_row=2, max_row=6)
-        labels = Reference(ws, min_col=1, min_row=2, max_row=6)
-        chart.add_data(data)
-        chart.set_categories(labels)
-        ws.add_chart(chart, f"D{row}")
+    def create_fancy_header(self, ws, title, row):
+        cell = ws.cell(row=row, column=1, value=title)
+        cell.font = Font(size=16, bold=True, color="FFFFFF")
+        cell.fill = PatternFill(start_color=self.colors['header_blue'], 
+                              end_color=self.colors['header_blue'], 
+                              fill_type="solid")
+        cell.alignment = Alignment(horizontal="center")
+        ws.merge_cells(start_row=row, start_column=1, end_row=row, end_column=6)
+        
+        border = Border(
+            left=Side(style='medium', color=self.colors['header_yellow']),
+            right=Side(style='medium', color=self.colors['header_yellow']),
+            top=Side(style='medium', color=self.colors['header_yellow']),
+            bottom=Side(style='medium', color=self.colors['header_yellow'])
+        )
+        cell.border = border
 
-    def save(self, filename="Financial_Planner.xlsx"):
+    def style_header_cell(self, cell):
+        cell.font = Font(bold=True)
+        cell.fill = PatternFill(start_color=self.colors['pastel_blue'], 
+                              end_color=self.colors['pastel_blue'], 
+                              fill_type="solid")
+        cell.alignment = Alignment(horizontal="center")
+
+    def save(self, filename=None):
+        if filename is None:
+            filename = f"Planificador_Financiero_{datetime.now().strftime('%Y%m%d')}.xlsx"
         self.workbook.save(filename)
 
 # Crear y guardar el archivo
 planner = FinancialPlanner()
-planner.create_monthly_budget()
-planner.create_debt_control()
-planner.create_savings_tracker()
+planner.create_annual_planner()
 planner.save()
 
 print("¡Archivo Excel creado exitosamente!")
